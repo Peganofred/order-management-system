@@ -1,0 +1,49 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: order-management-system
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/orderdb
+    username: orderuser
+    password: orderpass
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # 'validate' instead of 'update'/'create' -> schema is owned by Flyway migrations,
+      # not by Hibernate auto-generation. This avoids surprise schema drift in interviews
+      # and mirrors how real production teams manage DB schema.
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false   # avoids the "Open Session In View" anti-pattern (lazy-loading issues hidden in controllers)
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  jwt:
+    # DEV-ONLY DEFAULT. Must be overridden via the JWT_SECRET env var in any
+    # real deployment (staging/prod). HS256 needs >= 256 bits (32 bytes);
+    # this default is long enough on purpose. Never commit a real secret here.
+    secret: ${JWT_SECRET:dev-only-secret-do-not-use-in-prod-please-change-me-32bytes-min}
+    expiration-ms: ${JWT_EXPIRATION_MS:3600000}   # 1 hour
+
+logging:
+  level:
+    root: INFO
+    com.portfolio.orderms: DEBUG
+    org.hibernate.SQL: DEBUG
