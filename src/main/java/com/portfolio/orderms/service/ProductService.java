@@ -55,7 +55,16 @@ public class ProductService {
                 .build();
         product.setInventory(inventory);
 
-        Product saved = productRepository.save(product);
+        // saveAndFlush, not save: @CreationTimestamp/@UpdateTimestamp are
+        // populated by Hibernate at actual INSERT time (flush), not at
+        // persist() time. Our id doesn't need a flush to exist (@UuidGenerator
+        // assigns it in the JVM, unlike an IDENTITY/sequence strategy), so a
+        // plain save() would return before the INSERT runs, and this method
+        // would build a response with createdAt/updatedAt still null. Flushing
+        // here forces the INSERT now, inside this transaction, so the
+        // returned entity has real DB-generated timestamp values to map into
+        // ProductResponse.
+        Product saved = productRepository.saveAndFlush(product);
         return toResponse(saved);
     }
 
@@ -81,9 +90,14 @@ public class ProductService {
         // needed for the inventory row itself.
         product.getInventory().setStockQuantity(request.getStockQuantity());
 
-        // No explicit productRepository.save(product) needed: `product` is
-        // a managed entity inside this @Transactional method, so Hibernate
-        // flushes the changes automatically at commit (dirty checking).
+        // Explicit flush before mapping the response - same reasoning as
+        // createProduct's saveAndFlush. `product` is a managed entity, so
+        // Hibernate WOULD write these changes automatically at transaction
+        // commit via dirty checking - but @UpdateTimestamp's new value is
+        // only computed at that flush. Without forcing it here, toResponse()
+        // would read the stale pre-update `updatedAt` still sitting on the
+        // in-memory entity, not the value this update actually produces.
+        productRepository.flush();
         return toResponse(product);
     }
 
